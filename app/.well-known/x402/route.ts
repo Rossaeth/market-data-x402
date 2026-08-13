@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
-export async function GET() {
-  const base = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
+export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const base = host ? `${proto}://${host}` : "https://market-data-x402-5wh8-ivory.vercel.app";
 
   return NextResponse.json(
     {
@@ -17,6 +19,11 @@ export async function GET() {
         `${base}/api/news`,
       ],
     },
-    { headers: { "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=300" } }
+    {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=60",
+      },
+    }
   );
 }
