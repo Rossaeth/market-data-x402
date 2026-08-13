@@ -7,13 +7,20 @@ export async function GET(req: NextRequest) {
   const { x402ResourceServer } = await import("@x402/core/server");
   const { ExactEvmScheme } = await import("@x402/evm/exact/server");
   const { createCdpFacilitatorClient } = await import("@coinbase/cdp-sdk/x402");
+  const { declareDiscoveryExtension } = await import("@x402/extensions/bazaar");
 
   const facilitator = createCdpFacilitatorClient();
-  const server = new x402ResourceServer(facilitator).register("eip155:8453", new ExactEvmScheme());
-  const payTo = process.env.EVM_ADDRESS || "0xd850034a1cce920691a4880dea0fc064bccd4d45";
+  const server = new x402ResourceServer(facilitator).register(
+    "eip155:8453",
+    new ExactEvmScheme()
+  );
+  const payTo =
+    process.env.EVM_ADDRESS || "0xd850034a1cce920691a4880dea0fc064bccd4d45";
 
   const handler = async (request: NextRequest) => {
-    const symbol = (new URL(request.url).searchParams.get("symbol") || "AAPL").toUpperCase();
+    const symbol = (
+      new URL(request.url).searchParams.get("symbol") || "AAPL"
+    ).toUpperCase();
     const res = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`,
       { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 60 } }
@@ -33,11 +40,46 @@ export async function GET(req: NextRequest) {
     });
   };
 
-  const paid = withX402(handler as any, {
-    accepts: [{ scheme: "exact", price: "$0.003", network: "eip155:8453", payTo }],
-    description: "Single stock quote",
-    mimeType: "application/json",
-  }, server);
+  const paid = withX402(
+    handler as any,
+    {
+      accepts: [
+        {
+          scheme: "exact",
+          price: "$0.003",
+          network: "eip155:8453",
+          payTo,
+        },
+      ],
+      description: "Single stock quote",
+      mimeType: "application/json",
+      extensions: {
+        ...declareDiscoveryExtension({
+          input: { symbol: "AAPL" },
+          inputSchema: {
+            properties: {
+              symbol: {
+                type: "string",
+                description: "Stock ticker symbol",
+              },
+            },
+            required: ["symbol"],
+          },
+          output: {
+            example: {
+              symbol: "AAPL",
+              price: 190.5,
+              previousClose: 189.0,
+              currency: "USD",
+              exchange: "NMS",
+              timestamp: "2026-08-13T00:00:00.000Z",
+            },
+          },
+        }),
+      },
+    },
+    server
+  );
 
   return paid(req);
 }

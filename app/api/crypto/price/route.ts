@@ -1,58 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withX402 } from "@x402/next";
-import { x402ResourceServer } from "@x402/core/server";
-import { ExactEvmScheme } from "@x402/evm/exact/server";
-import { createCdpFacilitatorClient } from "@coinbase/cdp-sdk/x402";
 
-const facilitator = createCdpFacilitatorClient();
-const server = new x402ResourceServer(facilitator)
-  .register("eip155:8453", new ExactEvmScheme());
+export const dynamic = "force-dynamic";
 
-async function handler(req: NextRequest) {
-  try {
+export async function GET(req: NextRequest) {
+  const { withX402 } = await import("@x402/next");
+  const { x402ResourceServer } = await import("@x402/core/server");
+  const { ExactEvmScheme } = await import("@x402/evm/exact/server");
+  const { createCdpFacilitatorClient } = await import("@coinbase/cdp-sdk/x402");
+  const { declareDiscoveryExtension } = await import("@x402/extensions/bazaar");
+
+  const facilitator = createCdpFacilitatorClient();
+  const server = new x402ResourceServer(facilitator).register(
+    "eip155:8453",
+    new ExactEvmScheme()
+  );
+  const payTo =
+    process.env.EVM_ADDRESS || "0xd850034a1cce920691a4880dea0fc064bccd4d45";
+
+  const handler = async (request: NextRequest) => {
     const ids =
-      new URL(req.url).searchParams.get("ids") || "bitcoin,ethereum,solana";
-
+      new URL(request.url).searchParams.get("ids") || "bitcoin,ethereum,solana";
     const res = await fetch(
       `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`,
       { next: { revalidate: 30 } }
     );
-
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: "upstream failed", source: null, timestamp: new Date().toISOString(), data: null },
-        { status: 502 }
-      );
-    }
-
+    if (!res.ok) return NextResponse.json({ error: "upstream failed" }, { status: 502 });
     const data = await res.json();
     return NextResponse.json({
-      error: null,
       source: "coingecko",
       timestamp: new Date().toISOString(),
       data,
     });
-  } catch {
-    return NextResponse.json(
-      { error: "internal error", source: null, timestamp: new Date().toISOString(), data: null },
-      { status: 500 }
-    );
-  }
-}
+  };
 
-export const GET = withX402(
-  handler as any,
-  {
-    accepts: [
-      {
-        scheme: "exact",
-        price: "$0.002",
-        network: "eip155:8453",
-        payTo: process.env.EVM_ADDRESS!,
+  const paid = withX402(
+    handler as any,
+    {
+      accepts: [
+        {
+          scheme: "exact",
+          price: "$0.002",
+          network: "eip155:8453",
+          payTo,
+        },
+      ],
+      description: "Crypto prices by coin ids",
+      mimeType: "application/json",
+      extensions: {
+        ...declareDiscoveryExtension({
+          input: { ids: "bitcoin,ethereum,solana" },
+          inputSchema: {
+            properties: {
+              ids: {
+                type: "string",
+                description: "Comma-separated CoinGecko coin ids",
+              },
+            },
+            required: ["ids"],
+          },
+          output: {
+            example: {
+              source: "coingecko",
+              timestamp: "2026-08-13T00:00:00.000Z",
+              data: { bitcoin: { usd: 65000, usd_24h_change: 1.2 } },
+            },
+          },
+        }),
       },
-    ],
-    description: "Crypto price data",
-    mimeType: "application/json",
-  },
-  server
-);
+    },
+    server
+  );
+
+  return paid(req);
+}
