@@ -41,7 +41,7 @@ function route(
   };
 }
 
-export const middleware = paymentProxy(
+export const proxy = paymentProxy(
   {
     "/api/crypto/price": route(
       "$0.002",
