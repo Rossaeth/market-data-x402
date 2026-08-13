@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     : "https://market-data-x402-5wh8-ivory.vercel.app";
 
   return NextResponse.json({
-    version: 2,
+    version: 1,
     resources: [`${base}/api/crypto/price`],
   });
 }
