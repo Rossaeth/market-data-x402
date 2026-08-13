@@ -2,16 +2,10 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const base = host
-    ? `${proto}://${host}`
-    : "https://market-data-x402-5wh8-ivory.vercel.app";
+export async function GET() {
+  const base = "https://market-data-x402-5wh8-ivory.vercel.app";
 
-  const payTo = "0xd850034a1cce920691a4880dea0fc064bccd4d45";
-
-  const payment = (amount: string) => ({
+  const pay = (amount: string) => ({
     price: { mode: "fixed", currency: "USD", amount },
     protocols: [
       {
@@ -19,43 +13,11 @@ export async function GET(req: Request) {
         version: 2,
         scheme: "exact",
         network: "eip155:8453",
-        payTo,
+        payTo: "0xd850034a1cce920691a4880dea0fc064bccd4d45",
         asset: "USDC",
       },
     ],
   });
-
-  const body = (properties: Record<string, unknown>, required: string[]) => ({
-    required: true,
-    content: {
-      "application/json": {
-        schema: {
-          type: "object",
-          properties,
-          required,
-          additionalProperties: false,
-        },
-      },
-    },
-  });
-
-  const ok = {
-    description: "Success",
-    content: {
-      "application/json": {
-        schema: { type: "object", additionalProperties: true },
-      },
-    },
-  };
-
-  const r402 = {
-    description: "Payment Required (x402)",
-    content: {
-      "application/json": {
-        schema: { type: "object", additionalProperties: true },
-      },
-    },
-  };
 
   const spec = {
     openapi: "3.1.0",
@@ -63,9 +25,7 @@ export async function GET(req: Request) {
       title: "Market Data x402 API",
       version: "1.0.0",
       description:
-        "Pay-per-request crypto & stock market data via x402 USDC on Base Mainnet. No API keys.",
-      "x-guidance":
-        "All market endpoints are paid via x402 on Base (eip155:8453). Unauthenticated calls return HTTP 402. After USDC payment, retry to receive JSON. Example: GET /api/crypto/price?ids=bitcoin",
+        "Pay-per-request crypto & stock market data via x402 USDC on Base Mainnet.",
       contact: {
         name: "Rossadi",
         email: "rossadi.ardian@gmail.com",
@@ -87,18 +47,18 @@ export async function GET(req: Request) {
               description: "Comma-separated CoinGecko ids",
             },
           ],
-          requestBody: body(
-            {
-              ids: {
-                type: "string",
-                description: "Comma-separated CoinGecko ids",
-                example: "bitcoin,ethereum,solana",
+          responses: {
+            "200": {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: { type: "object", additionalProperties: true },
+                },
               },
             },
-            ["ids"]
-          ),
-          responses: { "200": ok, "402": r402 },
-          "x-payment-info": payment("0.002000"),
+            "402": { description: "Payment Required (x402)" },
+          },
+          "x-payment-info": pay("0.002000"),
         },
       },
       "/api/crypto/top": {
@@ -111,23 +71,27 @@ export async function GET(req: Request) {
               name: "limit",
               in: "query",
               required: true,
-              schema: { type: "integer", minimum: 1, maximum: 50, example: 20 },
-            },
-          ],
-          requestBody: body(
-            {
-              limit: {
+              schema: {
                 type: "integer",
                 minimum: 1,
                 maximum: 50,
                 example: 20,
-                description: "Number of coins",
+              },
+              description: "Number of coins",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: { type: "object", additionalProperties: true },
+                },
               },
             },
-            ["limit"]
-          ),
-          responses: { "200": ok, "402": r402 },
-          "x-payment-info": payment("0.006000"),
+            "402": { description: "Payment Required (x402)" },
+          },
+          "x-payment-info": pay("0.006000"),
         },
       },
       "/api/crypto/ohlc": {
@@ -153,19 +117,18 @@ export async function GET(req: Request) {
               },
             },
           ],
-          requestBody: body(
-            {
-              id: { type: "string", example: "bitcoin" },
-              days: {
-                type: "string",
-                enum: ["1", "7", "14", "30", "90", "180", "365", "max"],
-                example: "7",
+          responses: {
+            "200": {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: { type: "object", additionalProperties: true },
+                },
               },
             },
-            ["id", "days"]
-          ),
-          responses: { "200": ok, "402": r402 },
-          "x-payment-info": payment("0.015000"),
+            "402": { description: "Payment Required (x402)" },
+          },
+          "x-payment-info": pay("0.015000"),
         },
       },
       "/api/stock/quote": {
@@ -181,18 +144,18 @@ export async function GET(req: Request) {
               schema: { type: "string", example: "AAPL" },
             },
           ],
-          requestBody: body(
-            {
-              symbol: {
-                type: "string",
-                example: "AAPL",
-                description: "Ticker symbol",
+          responses: {
+            "200": {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: { type: "object", additionalProperties: true },
+                },
               },
             },
-            ["symbol"]
-          ),
-          responses: { "200": ok, "402": r402 },
-          "x-payment-info": payment("0.003000"),
+            "402": { description: "Payment Required (x402)" },
+          },
+          "x-payment-info": pay("0.003000"),
         },
       },
       "/api/stock/batch": {
@@ -205,21 +168,25 @@ export async function GET(req: Request) {
               name: "symbols",
               in: "query",
               required: true,
-              schema: { type: "string", example: "AAPL,TSLA,NVDA" },
-            },
-          ],
-          requestBody: body(
-            {
-              symbols: {
+              schema: {
                 type: "string",
                 example: "AAPL,TSLA,NVDA",
-                description: "Comma-separated tickers (max 10)",
+              },
+              description: "Comma-separated tickers (max 10)",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: { type: "object", additionalProperties: true },
+                },
               },
             },
-            ["symbols"]
-          ),
-          responses: { "200": ok, "402": r402 },
-          "x-payment-info": payment("0.012000"),
+            "402": { description: "Payment Required (x402)" },
+          },
+          "x-payment-info": pay("0.012000"),
         },
       },
       "/api/news": {
@@ -238,18 +205,26 @@ export async function GET(req: Request) {
               name: "limit",
               in: "query",
               required: false,
-              schema: { type: "integer", minimum: 1, maximum: 20, example: 10 },
+              schema: {
+                type: "integer",
+                minimum: 1,
+                maximum: 20,
+                example: 10,
+              },
             },
           ],
-          requestBody: body(
-            {
-              q: { type: "string", example: "cryptocurrency" },
-              limit: { type: "integer", minimum: 1, maximum: 20, example: 10 },
+          responses: {
+            "200": {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: { type: "object", additionalProperties: true },
+                },
+              },
             },
-            ["q"]
-          ),
-          responses: { "200": ok, "402": r402 },
-          "x-payment-info": payment("0.020000"),
+            "402": { description: "Payment Required (x402)" },
+          },
+          "x-payment-info": pay("0.020000"),
         },
       },
       "/.well-known/x402": {
@@ -263,16 +238,7 @@ export async function GET(req: Request) {
               description: "Resource list",
               content: {
                 "application/json": {
-                  schema: {
-                    type: "object",
-                    properties: {
-                      version: { type: "integer" },
-                      resources: {
-                        type: "array",
-                        items: { type: "string", format: "uri" },
-                      },
-                    },
-                  },
+                  schema: { type: "object", additionalProperties: true },
                 },
               },
             },
@@ -282,11 +248,5 @@ export async function GET(req: Request) {
     },
   };
 
-  return NextResponse.json(spec, {
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "public, max-age=30",
-      "Content-Type": "application/json",
-    },
-  });
+  return NextResponse.json(spec);
 }
