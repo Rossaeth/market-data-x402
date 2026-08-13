@@ -11,6 +11,13 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     version: 1,
-    resources: [`${base}/api/crypto/price`],
+    resources: [
+      `${base}/api/crypto/price`,
+      `${base}/api/crypto/top`,
+      `${base}/api/crypto/ohlc`,
+      `${base}/api/stock/quote`,
+      `${base}/api/stock/batch`,
+      `${base}/api/news`,
+    ],
   });
 }
