@@ -12,11 +12,7 @@ export async function GET(req: Request) {
   const payTo = "0xd850034a1cce920691a4880dea0fc064bccd4d45";
 
   const payment = (amount: string) => ({
-    price: {
-      mode: "fixed",
-      currency: "USD",
-      amount,
-    },
+    price: { mode: "fixed", currency: "USD", amount },
     protocols: [
       {
         name: "x402",
@@ -29,16 +25,34 @@ export async function GET(req: Request) {
     ],
   });
 
-  const paid402 = {
-    "402": {
-      description: "Payment Required — x402 challenge",
-      content: {
-        "application/json": {
-          schema: {
-            type: "object",
-            additionalProperties: true,
-          },
+  const body = (properties: Record<string, unknown>, required: string[]) => ({
+    required: true,
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          properties,
+          required,
+          additionalProperties: false,
         },
+      },
+    },
+  });
+
+  const ok = {
+    description: "Success",
+    content: {
+      "application/json": {
+        schema: { type: "object", additionalProperties: true },
+      },
+    },
+  };
+
+  const r402 = {
+    description: "Payment Required (x402)",
+    content: {
+      "application/json": {
+        schema: { type: "object", additionalProperties: true },
       },
     },
   };
@@ -49,10 +63,13 @@ export async function GET(req: Request) {
       title: "Market Data x402 API",
       version: "1.0.0",
       description:
-        "Pay-per-request crypto and stock market data. Settled in USDC on Base Mainnet via x402. No API keys required.",
+        "Pay-per-request crypto & stock market data via x402 USDC on Base Mainnet. No API keys.",
       "x-guidance":
-        "All data endpoints are x402-paid on Base (eip155:8453). Call without payment to receive HTTP 402. After paying USDC, retry with payment proof to receive JSON. Start with GET /api/crypto/price?ids=bitcoin",
-      contact: { name: "Rossadi" },
+        "All market endpoints are paid via x402 on Base (eip155:8453). Unauthenticated calls return HTTP 402. After USDC payment, retry to receive JSON. Example: GET /api/crypto/price?ids=bitcoin",
+      contact: {
+        name: "Rossadi",
+        email: "rossadi.ardian@gmail.com",
+      },
     },
     servers: [{ url: base }],
     paths: {
@@ -60,40 +77,27 @@ export async function GET(req: Request) {
         get: {
           operationId: "getCryptoPrice",
           summary: "Crypto prices by coin ids",
-          description:
-            "Current USD price, 24h change, and market cap for one or more CoinGecko ids.",
           tags: ["Crypto"],
           parameters: [
             {
               name: "ids",
               in: "query",
               required: true,
-              description: "Comma-separated CoinGecko coin ids",
-              schema: {
+              schema: { type: "string", example: "bitcoin,ethereum" },
+              description: "Comma-separated CoinGecko ids",
+            },
+          ],
+          requestBody: body(
+            {
+              ids: {
                 type: "string",
-                minLength: 1,
+                description: "Comma-separated CoinGecko ids",
                 example: "bitcoin,ethereum,solana",
               },
             },
-          ],
-          responses: {
-            "200": {
-              description: "Price payload",
-              content: {
-                "application/json": {
-                  schema: {
-                    type: "object",
-                    properties: {
-                      source: { type: "string" },
-                      timestamp: { type: "string", format: "date-time" },
-                      data: { type: "object", additionalProperties: true },
-                    },
-                  },
-                },
-              },
-            },
-            ...paid402,
-          },
+            ["ids"]
+          ),
+          responses: { "200": ok, "402": r402 },
           "x-payment-info": payment("0.002000"),
         },
       },
@@ -101,35 +105,28 @@ export async function GET(req: Request) {
         get: {
           operationId: "getCryptoTop",
           summary: "Top coins + gainers/losers",
-          description:
-            "Top coins by market cap plus 24h top gainers and losers.",
           tags: ["Crypto"],
           parameters: [
             {
               name: "limit",
               in: "query",
               required: true,
-              description: "How many coins to return (1-50)",
-              schema: {
+              schema: { type: "integer", minimum: 1, maximum: 50, example: 20 },
+            },
+          ],
+          requestBody: body(
+            {
+              limit: {
                 type: "integer",
                 minimum: 1,
                 maximum: 50,
-                default: 20,
                 example: 20,
+                description: "Number of coins",
               },
             },
-          ],
-          responses: {
-            "200": {
-              description: "Top market list with gainers/losers",
-              content: {
-                "application/json": {
-                  schema: { type: "object", additionalProperties: true },
-                },
-              },
-            },
-            ...paid402,
-          },
+            ["limit"]
+          ),
+          responses: { "200": ok, "402": r402 },
           "x-payment-info": payment("0.006000"),
         },
       },
@@ -137,44 +134,37 @@ export async function GET(req: Request) {
         get: {
           operationId: "getCryptoOhlc",
           summary: "OHLC candle data",
-          description: "Open/High/Low/Close candles for charting a coin.",
           tags: ["Crypto"],
           parameters: [
             {
               name: "id",
               in: "query",
               required: true,
-              description: "CoinGecko coin id",
-              schema: {
-                type: "string",
-                minLength: 1,
-                example: "bitcoin",
-              },
+              schema: { type: "string", example: "bitcoin" },
             },
             {
               name: "days",
               in: "query",
               required: true,
-              description: "Lookback window in days",
               schema: {
                 type: "string",
                 enum: ["1", "7", "14", "30", "90", "180", "365", "max"],
-                default: "7",
                 example: "7",
               },
             },
           ],
-          responses: {
-            "200": {
-              description: "OHLC candles",
-              content: {
-                "application/json": {
-                  schema: { type: "object", additionalProperties: true },
-                },
+          requestBody: body(
+            {
+              id: { type: "string", example: "bitcoin" },
+              days: {
+                type: "string",
+                enum: ["1", "7", "14", "30", "90", "180", "365", "max"],
+                example: "7",
               },
             },
-            ...paid402,
-          },
+            ["id", "days"]
+          ),
+          responses: { "200": ok, "402": r402 },
           "x-payment-info": payment("0.015000"),
         },
       },
@@ -182,32 +172,26 @@ export async function GET(req: Request) {
         get: {
           operationId: "getStockQuote",
           summary: "Single stock quote",
-          description: "Delayed equity quote by ticker symbol.",
           tags: ["Stocks"],
           parameters: [
             {
               name: "symbol",
               in: "query",
               required: true,
-              description: "Stock ticker symbol",
-              schema: {
-                type: "string",
-                minLength: 1,
-                example: "AAPL",
-              },
+              schema: { type: "string", example: "AAPL" },
             },
           ],
-          responses: {
-            "200": {
-              description: "Quote object",
-              content: {
-                "application/json": {
-                  schema: { type: "object", additionalProperties: true },
-                },
+          requestBody: body(
+            {
+              symbol: {
+                type: "string",
+                example: "AAPL",
+                description: "Ticker symbol",
               },
             },
-            ...paid402,
-          },
+            ["symbol"]
+          ),
+          responses: { "200": ok, "402": r402 },
           "x-payment-info": payment("0.003000"),
         },
       },
@@ -215,32 +199,26 @@ export async function GET(req: Request) {
         get: {
           operationId: "getStockBatch",
           summary: "Batch stock quotes",
-          description: "Multiple stock quotes in one call (max 10 symbols).",
           tags: ["Stocks"],
           parameters: [
             {
               name: "symbols",
               in: "query",
               required: true,
-              description: "Comma-separated ticker symbols (max 10)",
-              schema: {
-                type: "string",
-                minLength: 1,
-                example: "AAPL,TSLA,NVDA",
-              },
+              schema: { type: "string", example: "AAPL,TSLA,NVDA" },
             },
           ],
-          responses: {
-            "200": {
-              description: "Batch quote results",
-              content: {
-                "application/json": {
-                  schema: { type: "object", additionalProperties: true },
-                },
+          requestBody: body(
+            {
+              symbols: {
+                type: "string",
+                example: "AAPL,TSLA,NVDA",
+                description: "Comma-separated tickers (max 10)",
               },
             },
-            ...paid402,
-          },
+            ["symbols"]
+          ),
+          responses: { "200": ok, "402": r402 },
           "x-payment-info": payment("0.012000"),
         },
       },
@@ -248,53 +226,36 @@ export async function GET(req: Request) {
         get: {
           operationId: "getMarketNews",
           summary: "Crypto & market news",
-          description: "Latest news articles for a query/category.",
           tags: ["News"],
           parameters: [
             {
               name: "q",
               in: "query",
               required: true,
-              description: "Search query or category",
-              schema: {
-                type: "string",
-                minLength: 1,
-                example: "cryptocurrency",
-              },
+              schema: { type: "string", example: "cryptocurrency" },
             },
             {
               name: "limit",
               in: "query",
               required: false,
-              description: "Number of articles (1-20)",
-              schema: {
-                type: "integer",
-                minimum: 1,
-                maximum: 20,
-                default: 10,
-                example: 10,
-              },
+              schema: { type: "integer", minimum: 1, maximum: 20, example: 10 },
             },
           ],
-          responses: {
-            "200": {
-              description: "News list",
-              content: {
-                "application/json": {
-                  schema: { type: "object", additionalProperties: true },
-                },
-              },
+          requestBody: body(
+            {
+              q: { type: "string", example: "cryptocurrency" },
+              limit: { type: "integer", minimum: 1, maximum: 20, example: 10 },
             },
-            ...paid402,
-          },
+            ["q"]
+          ),
+          responses: { "200": ok, "402": r402 },
           "x-payment-info": payment("0.020000"),
         },
       },
       "/.well-known/x402": {
         get: {
           operationId: "getX402Discovery",
-          summary: "x402 resource discovery list",
-          description: "Compatibility list of paid resource URLs.",
+          summary: "x402 resource list",
           tags: ["Discovery"],
           security: [],
           responses: {
