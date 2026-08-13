@@ -9,25 +9,48 @@ const server = new x402ResourceServer(facilitator)
   .register("eip155:8453", new ExactEvmScheme());
 
 async function handler(req: NextRequest) {
-  const ids = new URL(req.url).searchParams.get("ids") || "bitcoin,ethereum,solana";
-  const res = await fetch(
-    `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`,
-    { next: { revalidate: 30 } }
-  );
-  if (!res.ok) return NextResponse.json({ error: "upstream failed" }, { status: 502 });
-  const data = await res.json();
-  return NextResponse.json({ source: "coingecko", timestamp: new Date().toISOString(), data });
+  try {
+    const ids =
+      new URL(req.url).searchParams.get("ids") || "bitcoin,ethereum,solana";
+
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`,
+      { next: { revalidate: 30 } }
+    );
+
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: "upstream failed", source: null, timestamp: new Date().toISOString(), data: null },
+        { status: 502 }
+      );
+    }
+
+    const data = await res.json();
+    return NextResponse.json({
+      error: null,
+      source: "coingecko",
+      timestamp: new Date().toISOString(),
+      data,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "internal error", source: null, timestamp: new Date().toISOString(), data: null },
+      { status: 500 }
+    );
+  }
 }
 
 export const GET = withX402(
-  handler,
+  handler as any,
   {
-    accepts: [{
-      scheme: "exact",
-      price: "$0.002",
-      network: "eip155:8453",
-      payTo: process.env.EVM_ADDRESS!,
-    }],
+    accepts: [
+      {
+        scheme: "exact",
+        price: "$0.002",
+        network: "eip155:8453",
+        payTo: process.env.EVM_ADDRESS!,
+      },
+    ],
     description: "Crypto price data",
     mimeType: "application/json",
   },
