@@ -14,21 +14,23 @@ export async function GET(req: NextRequest) {
     "eip155:8453",
     new ExactEvmScheme()
   );
-  const payTo =
-    process.env.EVM_ADDRESS || "0xd850034a1cce920691a4880dea0fc064bccd4d45";
+  const payTo = (process.env.EVM_ADDRESS ||
+    "0xd850034a1cce920691a4880dea0fc064bccd4d45") as `0x${string}`;
 
-  const handler = async (request: NextRequest) => {
+  async function handler(request: NextRequest) {
     const limit = Math.min(
-      Number(new URL(request.url).searchParams.get("limit") || 20),
+      Number(new URL(request.url).searchParams.get("limit") || 20) || 20,
       50
     );
     const res = await fetch(
       `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${limit}&page=1&sparkline=false&price_change_percentage=24h`,
       { next: { revalidate: 60 } }
     );
-    if (!res.ok) return NextResponse.json({ error: "upstream failed" }, { status: 502 });
+    if (!res.ok) {
+      return NextResponse.json({ error: "upstream failed" }, { status: 502 });
+    }
     const data = await res.json();
-    const simplified = data.map((c: any) => ({
+    const simplified = (Array.isArray(data) ? data : []).map((c: any) => ({
       id: c.id,
       symbol: c.symbol,
       name: c.name,
@@ -47,18 +49,13 @@ export async function GET(req: NextRequest) {
       top_gainers: sorted.slice(0, 5),
       top_losers: sorted.slice(-5).reverse(),
     });
-  };
+  }
 
   const paid = withX402(
     handler as any,
     {
       accepts: [
-        {
-          scheme: "exact",
-          price: "$0.006",
-          network: "eip155:8453",
-          payTo,
-        },
+        { scheme: "exact", price: "$0.006", network: "eip155:8453", payTo },
       ],
       description: "Top coins by market cap + gainers/losers",
       mimeType: "application/json",
@@ -71,7 +68,7 @@ export async function GET(req: NextRequest) {
                 type: "integer",
                 minimum: 1,
                 maximum: 50,
-                description: "Number of coins to return",
+                description: "Number of coins",
               },
             },
             required: ["limit"],

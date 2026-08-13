@@ -14,35 +14,32 @@ export async function GET(req: NextRequest) {
     "eip155:8453",
     new ExactEvmScheme()
   );
-  const payTo =
-    process.env.EVM_ADDRESS || "0xd850034a1cce920691a4880dea0fc064bccd4d45";
+  const payTo = (process.env.EVM_ADDRESS ||
+    "0xd850034a1cce920691a4880dea0fc064bccd4d45") as `0x${string}`;
 
-  const handler = async (request: NextRequest) => {
+  async function handler(request: NextRequest) {
     const ids =
       new URL(request.url).searchParams.get("ids") || "bitcoin,ethereum,solana";
     const res = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`,
+      `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`,
       { next: { revalidate: 30 } }
     );
-    if (!res.ok) return NextResponse.json({ error: "upstream failed" }, { status: 502 });
+    if (!res.ok) {
+      return NextResponse.json({ error: "upstream failed" }, { status: 502 });
+    }
     const data = await res.json();
     return NextResponse.json({
       source: "coingecko",
       timestamp: new Date().toISOString(),
       data,
     });
-  };
+  }
 
   const paid = withX402(
     handler as any,
     {
       accepts: [
-        {
-          scheme: "exact",
-          price: "$0.002",
-          network: "eip155:8453",
-          payTo,
-        },
+        { scheme: "exact", price: "$0.002", network: "eip155:8453", payTo },
       ],
       description: "Crypto prices by coin ids",
       mimeType: "application/json",

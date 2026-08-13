@@ -14,20 +14,22 @@ export async function GET(req: NextRequest) {
     "eip155:8453",
     new ExactEvmScheme()
   );
-  const payTo =
-    process.env.EVM_ADDRESS || "0xd850034a1cce920691a4880dea0fc064bccd4d45";
+  const payTo = (process.env.EVM_ADDRESS ||
+    "0xd850034a1cce920691a4880dea0fc064bccd4d45") as `0x${string}`;
 
-  const handler = async (request: NextRequest) => {
+  async function handler(request: NextRequest) {
     const sp = new URL(request.url).searchParams;
     const id = sp.get("id") || "bitcoin";
-    const days = sp.get("days") || "1";
+    const days = sp.get("days") || "7";
     const res = await fetch(
-      `https://api.coingecko.com/api/v3/coins/${id}/ohlc?vs_currency=usd&days=${days}`,
+      `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/ohlc?vs_currency=usd&days=${encodeURIComponent(days)}`,
       { next: { revalidate: 120 } }
     );
-    if (!res.ok) return NextResponse.json({ error: "upstream failed" }, { status: 502 });
+    if (!res.ok) {
+      return NextResponse.json({ error: "upstream failed" }, { status: 502 });
+    }
     const data = await res.json();
-    const candles = data.map((c: number[]) => ({
+    const candles = (Array.isArray(data) ? data : []).map((c: number[]) => ({
       time: c[0],
       open: c[1],
       high: c[2],
@@ -40,18 +42,13 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
       candles,
     });
-  };
+  }
 
   const paid = withX402(
     handler as any,
     {
       accepts: [
-        {
-          scheme: "exact",
-          price: "$0.015",
-          network: "eip155:8453",
-          payTo,
-        },
+        { scheme: "exact", price: "$0.015", network: "eip155:8453", payTo },
       ],
       description: "OHLC candle data",
       mimeType: "application/json",
@@ -73,7 +70,6 @@ export async function GET(req: NextRequest) {
             example: {
               id: "bitcoin",
               days: "7",
-              timestamp: "2026-08-13T00:00:00.000Z",
               candles: [{ time: 0, open: 1, high: 2, low: 0.5, close: 1.5 }],
             },
           },

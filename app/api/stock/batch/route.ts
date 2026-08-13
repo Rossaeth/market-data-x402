@@ -14,23 +14,24 @@ export async function GET(req: NextRequest) {
     "eip155:8453",
     new ExactEvmScheme()
   );
-  const payTo =
-    process.env.EVM_ADDRESS || "0xd850034a1cce920691a4880dea0fc064bccd4d45";
+  const payTo = (process.env.EVM_ADDRESS ||
+    "0xd850034a1cce920691a4880dea0fc064bccd4d45") as `0x${string}`;
 
-  const handler = async (request: NextRequest) => {
+  async function handler(request: NextRequest) {
     const symbols = (
       new URL(request.url).searchParams.get("symbols") ||
       "AAPL,MSFT,GOOGL,TSLA,NVDA"
     )
       .split(",")
       .map((s) => s.trim().toUpperCase())
+      .filter(Boolean)
       .slice(0, 10);
 
     const results = await Promise.all(
       symbols.map(async (symbol) => {
         try {
           const res = await fetch(
-            `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`,
+            `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
             {
               headers: { "User-Agent": "Mozilla/5.0" },
               next: { revalidate: 60 },
@@ -62,18 +63,13 @@ export async function GET(req: NextRequest) {
       count: results.length,
       data: results,
     });
-  };
+  }
 
   const paid = withX402(
     handler as any,
     {
       accepts: [
-        {
-          scheme: "exact",
-          price: "$0.012",
-          network: "eip155:8453",
-          payTo,
-        },
+        { scheme: "exact", price: "$0.012", network: "eip155:8453", payTo },
       ],
       description: "Multiple stock quotes",
       mimeType: "application/json",
