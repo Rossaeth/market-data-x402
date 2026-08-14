@@ -61,7 +61,7 @@ export const proxy = paymentProxy(
       { limit: 20 },
       {
         properties: {
-          limit: { type: "integer", minimum: 1, maximum: 50 },
+          limit: { type: "string", description: "Number of coins to return (1-50)" },
         },
         required: ["limit"],
       },
@@ -114,7 +114,7 @@ export const proxy = paymentProxy(
       {
         properties: {
           q: { type: "string" },
-          limit: { type: "integer", minimum: 1, maximum: 20 },
+          limit: { type: "string", description: "Number of articles to return (1-20)" },
         },
         required: ["q"],
       },
