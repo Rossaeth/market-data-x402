@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { protect, routeConfig } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+const config = routeConfig(
+  "$0.02",
+  "Crypto & market news",
+  { q: "cryptocurrency", limit: 10 },
+  {
+    properties: {
+      q: { type: "string" },
+      limit: { type: "string", description: "Number of articles to return (1-20)" },
+    },
+    required: ["q"],
+  },
+  { articles: [] }
+);
+
+async function handler(req: NextRequest) {
   const sp = new URL(req.url).searchParams;
   const query = sp.get("q") || "cryptocurrency";
   const limit = Math.min(Number(sp.get("limit") || 10) || 10, 20);
@@ -27,8 +42,6 @@ export async function GET(req: NextRequest) {
   const json = await res.json();
   const items = json.result || json.data || json.Data || json.news || [];
 
-  // Optional client-side filter by query term since CoinStats /news
-  // doesn't support a text search param the way CryptoCompare did.
   const q = query.toLowerCase();
   const filtered = query && query !== "cryptocurrency"
     ? items.filter((a: any) =>
@@ -57,3 +70,5 @@ export async function GET(req: NextRequest) {
     articles,
   });
 }
+
+export const GET = protect("/api/news", config, handler);

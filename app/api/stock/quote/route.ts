@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { protect, routeConfig } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+const config = routeConfig(
+  "$0.003",
+  "Single stock quote",
+  { symbol: "AAPL" },
+  {
+    properties: {
+      symbol: { type: "string", description: "Ticker" },
+    },
+    required: ["symbol"],
+  },
+  { symbol: "AAPL", price: 190 }
+);
+
+async function handler(req: NextRequest) {
   const symbol = (
     new URL(req.url).searchParams.get("symbol") || "AAPL"
   ).toUpperCase();
@@ -36,3 +50,5 @@ export async function GET(req: NextRequest) {
     note: "Delayed data",
   });
 }
+
+export const GET = protect("/api/stock/quote", config, handler);

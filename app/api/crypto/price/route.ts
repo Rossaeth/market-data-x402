@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { protect, routeConfig } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+const config = routeConfig(
+  "$0.002",
+  "Crypto prices by coin ids",
+  { ids: "bitcoin,ethereum" },
+  {
+    properties: {
+      ids: { type: "string", description: "Comma-separated CoinGecko ids" },
+    },
+    required: ["ids"],
+  },
+  { source: "coingecko", data: { bitcoin: { usd: 65000 } } }
+);
+
+async function handler(req: NextRequest) {
   const ids =
     new URL(req.url).searchParams.get("ids") || "bitcoin,ethereum,solana";
   const res = await fetch(
@@ -19,3 +33,5 @@ export async function GET(req: NextRequest) {
     data,
   });
 }
+
+export const GET = protect("/api/crypto/price", config, handler);

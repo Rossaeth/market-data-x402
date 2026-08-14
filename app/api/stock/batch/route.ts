@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { protect, routeConfig } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+const config = routeConfig(
+  "$0.012",
+  "Batch stock quotes",
+  { symbols: "AAPL,TSLA,NVDA" },
+  {
+    properties: {
+      symbols: { type: "string", description: "Comma-separated tickers" },
+    },
+    required: ["symbols"],
+  },
+  { count: 3, data: [] }
+);
+
+async function handler(req: NextRequest) {
   const symbols = (
     new URL(req.url).searchParams.get("symbols") ||
     "AAPL,MSFT,GOOGL,TSLA,NVDA"
@@ -49,3 +63,5 @@ export async function GET(req: NextRequest) {
     data: results,
   });
 }
+
+export const GET = protect("/api/stock/batch", config, handler);

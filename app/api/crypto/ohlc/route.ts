@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { protect, routeConfig } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
 
-// Payment enforcement for this route is handled centrally by middleware.ts
-// (paymentProxy matches /api/crypto/ohlc). Do not wrap this handler with its
-// own x402 logic — doing so double-checks payment after the middleware has
-// already verified/consumed it and can incorrectly reject paid requests.
-export async function GET(req: NextRequest) {
+const config = routeConfig(
+  "$0.015",
+  "OHLC candle data",
+  { id: "bitcoin", days: "7" },
+  {
+    properties: {
+      id: { type: "string" },
+      days: {
+        type: "string",
+        enum: ["1", "7", "14", "30", "90", "180", "365", "max"],
+      },
+    },
+    required: ["id", "days"],
+  },
+  { id: "bitcoin", candles: [] }
+);
+
+async function handler(req: NextRequest) {
   const sp = new URL(req.url).searchParams;
   const id = sp.get("id") || "bitcoin";
   const days = sp.get("days") || "7";
@@ -36,3 +50,5 @@ export async function GET(req: NextRequest) {
     candles,
   });
 }
+
+export const GET = protect("/api/crypto/ohlc", config, handler);
