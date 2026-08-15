@@ -3,6 +3,9 @@ import { protect, routeConfig } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
 
+const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
+const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+
 const config = routeConfig(
   "$0.008",
   "Solana wallet portfolio (SOL + SPL token holdings)",
@@ -15,10 +18,27 @@ const config = routeConfig(
   },
   {
     address: "5oNDLrU6qw9Q3KJu2zEqufZ3gqU1n4JUoWVvoMGvmiDa",
-    total_value_usd: 0,
+    sol_balance: 0,
     tokens: [],
   }
 );
+
+async function rpc(method: string, params: unknown[]) {
+  const res = await fetch(SOLANA_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    next: { revalidate: 15 },
+  });
+  if (!res.ok) {
+    throw new Error(`rpc ${method} failed: ${res.status}`);
+  }
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(`rpc ${method} error: ${json.error.message}`);
+  }
+  return json.result;
+}
 
 async function handler(req: NextRequest) {
   const address = new URL(req.url).searchParams.get("address");
@@ -29,64 +49,48 @@ async function handler(req: NextRequest) {
     );
   }
 
-  const [detailRes, tokensRes] = await Promise.all([
-    fetch(
-      `https://pro-api.solscan.io/v2.0/account/detail?address=${encodeURIComponent(address)}`,
-      {
-        headers: { token: process.env.SOLSCAN_API_KEY || "" },
-        next: { revalidate: 30 },
-      }
-    ),
-    fetch(
-      `https://pro-api.solscan.io/v2.0/account/token-accounts?address=${encodeURIComponent(address)}&type=token&page=1&page_size=40&hide_zero=true`,
-      {
-        headers: { token: process.env.SOLSCAN_API_KEY || "" },
-        next: { revalidate: 30 },
-      }
-    ),
-  ]);
+  try {
+    const [balanceResult, tokenAccountsResult] = await Promise.all([
+      rpc("getBalance", [address]),
+      rpc("getTokenAccountsByOwner", [
+        address,
+        { programId: TOKEN_PROGRAM_ID },
+        { encoding: "jsonParsed" },
+      ]),
+    ]);
 
-  if (!detailRes.ok || !tokensRes.ok) {
-    const failed = !detailRes.ok ? detailRes : tokensRes;
-    const rawBody = await failed.text().catch(() => "");
-    console.log(
-      JSON.stringify({
-        event: "SOLSCAN_DEBUG",
-        status: failed.status,
-        keyPresent: !!process.env.SOLSCAN_API_KEY,
-        body: rawBody.slice(0, 500),
+    const lamports = balanceResult?.value ?? 0;
+
+    const tokens = (tokenAccountsResult?.value || [])
+      .map((acc: any) => {
+        const info = acc.account?.data?.parsed?.info;
+        const amount = info?.tokenAmount;
+        return {
+          token_account: acc.pubkey,
+          mint: info?.mint,
+          balance: amount?.uiAmount ?? null,
+          raw_amount: amount?.amount ?? null,
+          decimals: amount?.decimals ?? null,
+        };
       })
-    );
+      .filter((t: any) => t.balance && t.balance > 0);
+
+    return NextResponse.json({
+      address,
+      timestamp: new Date().toISOString(),
+      sol_balance_lamports: lamports,
+      sol_balance: lamports / 1e9,
+      tokens,
+    });
+  } catch (err) {
     return NextResponse.json(
       {
         error: "upstream failed",
-        status: failed.status,
-        upstream_body: rawBody.slice(0, 300),
+        message: err instanceof Error ? err.message : "unknown error",
       },
       { status: 502 }
     );
   }
-
-  const detailJson = await detailRes.json();
-  const tokensJson = await tokensRes.json();
-  const detail = detailJson.data || {};
-  const tokenList = tokensJson.data || [];
-
-  const tokens = tokenList.map((t: any) => ({
-    token_address: t.token_address,
-    token_account: t.token_account,
-    balance: t.amount,
-    decimals: t.token_decimals,
-    owner: t.owner ?? null,
-  }));
-
-  return NextResponse.json({
-    address,
-    timestamp: new Date().toISOString(),
-    sol_balance_lamports: detail.lamports ?? null,
-    sol_balance: typeof detail.lamports === "number" ? detail.lamports / 1e9 : null,
-    tokens,
-  });
 }
 
 export const GET = protect("/api/solana/wallet", config, handler);
