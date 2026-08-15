@@ -43,6 +43,12 @@ const endpoints = [
     desc: "Solana wallet portfolio (SOL + SPL token holdings)",
     example: "?address=5oNDLrU6qw9Q3KJu2zEqufZ3gqU1n4JUoWVvoMGvmiDa",
   },
+  {
+    path: "/api/solana/transactions",
+    price: "$0.006",
+    desc: "Recent transaction history for a Solana wallet",
+    example: "?address=5oNDLrU6qw9Q3KJu2zEqufZ3gqU1n4JUoWVvoMGvmiDa&limit=10",
+  },
 ];
 
 export default function Home() {
