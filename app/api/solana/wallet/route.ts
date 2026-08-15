@@ -40,8 +40,22 @@ async function handler(req: NextRequest) {
   );
 
   if (!res.ok) {
+    const rawBody = await res.text().catch(() => "");
+    console.log(
+      JSON.stringify({
+        event: "SOLSCAN_DEBUG",
+        status: res.status,
+        keyPresent: !!process.env.SOLSCAN_API_KEY,
+        keyPrefix: (process.env.SOLSCAN_API_KEY || "").slice(0, 12),
+        body: rawBody.slice(0, 500),
+      })
+    );
     return NextResponse.json(
-      { error: "upstream failed", status: res.status },
+      {
+        error: "upstream failed",
+        status: res.status,
+        upstream_body: rawBody.slice(0, 300),
+      },
       { status: 502 }
     );
   }
