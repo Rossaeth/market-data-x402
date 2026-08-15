@@ -14,15 +14,28 @@ export const solPayTo =
 
 const SOLANA_MAINNET = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp" as const;
 
-const facilitator = createCdpFacilitatorClient();
+let _server: ReturnType<typeof buildServer> | null = null;
 
-export const server = registerExactSvmScheme(
-  new x402ResourceServer(facilitator).register(
-    "eip155:8453",
-    new ExactEvmScheme()
-  ),
-  { networks: [SOLANA_MAINNET] }
-);
+function buildServer() {
+  const facilitator = createCdpFacilitatorClient();
+  return registerExactSvmScheme(
+    new x402ResourceServer(facilitator).register(
+      "eip155:8453",
+      new ExactEvmScheme()
+    ),
+    { networks: [SOLANA_MAINNET] }
+  );
+}
+
+// Lazily constructed on first actual request. Next.js evaluates route
+// modules at build time ("Collecting page data") to analyze static/dynamic
+// behavior — if the CDP facilitator client were built at module load time,
+// that build-time evaluation would crash with "Missing required CDP
+// credentials" since build-time env vars aren't guaranteed to be present.
+function getServer() {
+  if (!_server) _server = buildServer();
+  return _server;
+}
 
 export function routeConfig(
   price: string,
@@ -74,9 +87,13 @@ export function protect(
   config: ReturnType<typeof routeConfig>,
   handler: (req: NextRequest) => Promise<NextResponse>
 ) {
-  const wrapped = withX402(handler, config, server);
+  let wrapped: ((req: NextRequest) => Promise<NextResponse>) | null = null;
 
   return async (req: NextRequest) => {
+    if (!wrapped) {
+      wrapped = withX402(handler, config, getServer());
+    }
+
     const startedAt = Date.now();
     let res: NextResponse;
 
