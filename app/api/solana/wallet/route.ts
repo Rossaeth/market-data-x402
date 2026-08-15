@@ -29,53 +29,62 @@ async function handler(req: NextRequest) {
     );
   }
 
-  const res = await fetch(
-    `https://pro-api.solscan.io/v2.0/account/portfolio?address=${encodeURIComponent(address)}`,
-    {
-      headers: {
-        token: process.env.SOLSCAN_API_KEY || "",
-      },
-      next: { revalidate: 30 },
-    }
-  );
+  const [detailRes, tokensRes] = await Promise.all([
+    fetch(
+      `https://pro-api.solscan.io/v2.0/account/detail?address=${encodeURIComponent(address)}`,
+      {
+        headers: { token: process.env.SOLSCAN_API_KEY || "" },
+        next: { revalidate: 30 },
+      }
+    ),
+    fetch(
+      `https://pro-api.solscan.io/v2.0/account/token-accounts?address=${encodeURIComponent(address)}&type=token&page=1&page_size=40&hide_zero=true`,
+      {
+        headers: { token: process.env.SOLSCAN_API_KEY || "" },
+        next: { revalidate: 30 },
+      }
+    ),
+  ]);
 
-  if (!res.ok) {
-    const rawBody = await res.text().catch(() => "");
+  if (!detailRes.ok || !tokensRes.ok) {
+    const failed = !detailRes.ok ? detailRes : tokensRes;
+    const rawBody = await failed.text().catch(() => "");
     console.log(
       JSON.stringify({
         event: "SOLSCAN_DEBUG",
-        status: res.status,
+        status: failed.status,
         keyPresent: !!process.env.SOLSCAN_API_KEY,
-        keyPrefix: (process.env.SOLSCAN_API_KEY || "").slice(0, 12),
         body: rawBody.slice(0, 500),
       })
     );
     return NextResponse.json(
       {
         error: "upstream failed",
-        status: res.status,
+        status: failed.status,
         upstream_body: rawBody.slice(0, 300),
       },
       { status: 502 }
     );
   }
 
-  const json = await res.json();
-  const data = json.data || {};
+  const detailJson = await detailRes.json();
+  const tokensJson = await tokensRes.json();
+  const detail = detailJson.data || {};
+  const tokenList = tokensJson.data || [];
 
-  const tokens = (data.tokens || []).map((t: any) => ({
+  const tokens = tokenList.map((t: any) => ({
     token_address: t.token_address,
-    symbol: t.token_symbol || null,
-    name: t.token_name || null,
-    balance: t.balance,
-    value_usd: t.value ?? null,
+    token_account: t.token_account,
+    balance: t.amount,
+    decimals: t.token_decimals,
+    owner: t.owner ?? null,
   }));
 
   return NextResponse.json({
     address,
     timestamp: new Date().toISOString(),
-    total_value_usd: data.total_value ?? null,
-    sol_balance: data.sol_balance ?? null,
+    sol_balance_lamports: detail.lamports ?? null,
+    sol_balance: typeof detail.lamports === "number" ? detail.lamports / 1e9 : null,
     tokens,
   });
 }
