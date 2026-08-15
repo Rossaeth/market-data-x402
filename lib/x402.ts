@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { x402ResourceServer } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
+import { registerExactSvmScheme } from "@x402/svm/exact/server";
 import { createCdpFacilitatorClient } from "@coinbase/cdp-sdk/x402";
 import { declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { withX402 } from "@x402/next";
@@ -8,11 +9,19 @@ import { withX402 } from "@x402/next";
 export const payTo = (process.env.EVM_ADDRESS ||
   "0xd850034a1cce920691a4880dea0fc064bccd4d45") as `0x${string}`;
 
+export const solPayTo =
+  process.env.SOL_ADDRESS || "BvE4YGLKxWUPN1efMRgvWf47wnDLBwt7KFZS1VY2HCvt";
+
+const SOLANA_MAINNET = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp" as const;
+
 const facilitator = createCdpFacilitatorClient();
 
-export const server = new x402ResourceServer(facilitator).register(
-  "eip155:8453",
-  new ExactEvmScheme()
+export const server = registerExactSvmScheme(
+  new x402ResourceServer(facilitator).register(
+    "eip155:8453",
+    new ExactEvmScheme()
+  ),
+  { networks: [SOLANA_MAINNET] }
 );
 
 export function routeConfig(
@@ -29,6 +38,12 @@ export function routeConfig(
         price,
         network: "eip155:8453" as const,
         payTo,
+      },
+      {
+        scheme: "exact" as const,
+        price,
+        network: SOLANA_MAINNET,
+        payTo: solPayTo,
       },
     ],
     description,
