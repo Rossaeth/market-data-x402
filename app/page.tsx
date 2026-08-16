@@ -49,6 +49,12 @@ const endpoints = [
     desc: "Recent transaction history for a Solana wallet",
     example: "?address=5oNDLrU6qw9Q3KJu2zEqufZ3gqU1n4JUoWVvoMGvmiDa&limit=10",
   },
+  {
+    path: "/api/tts",
+    price: "$0.01",
+    desc: "Text-to-speech audio generation (any text)",
+    example: "?text=Bitcoin just crossed sixty three thousand dollars",
+  },
 ];
 
 export default function Home() {
