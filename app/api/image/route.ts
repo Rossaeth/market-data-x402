@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { protect, routeConfig } from "@/lib/x402";
+import sharp from "sharp";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ async function handler(req: NextRequest) {
         Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN || ""}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt, steps: 4, width: 512, height: 512 }),
+      body: JSON.stringify({ prompt, steps: 4 }),
     }
   );
 
@@ -74,11 +75,20 @@ async function handler(req: NextRequest) {
     );
   }
 
+  // The model doesn't support a width/height param and always returns a
+  // large image (~1024px). Resize + recompress server-side so the
+  // response payload stays small for every buyer.
+  const rawBuffer = Buffer.from(imageBase64, "base64");
+  const resizedBuffer = await sharp(rawBuffer)
+    .resize(384, 384, { fit: "inside" })
+    .jpeg({ quality: 60 })
+    .toBuffer();
+
   return NextResponse.json({
     prompt,
     timestamp: new Date().toISOString(),
     mime_type: "image/jpeg",
-    image_base64: imageBase64,
+    image_base64: resizedBuffer.toString("base64"),
   });
 }
 
