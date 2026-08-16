@@ -10,7 +10,7 @@ const config = routeConfig(
   "Recent transaction history for a Solana wallet",
   {
     address: "5oNDLrU6qw9Q3KJu2zEqufZ3gqU1n4JUoWVvoMGvmiDa",
-    limit: 10,
+    limit: "10",
   },
   {
     properties: {
