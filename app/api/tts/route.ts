@@ -3,10 +3,7 @@ import { protect, routeConfig } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
 
-const CF_ACCOUNT_ID =
-  process.env.CLOUDFLARE_ACCOUNT_ID || "516772a6c4aca600c2b1f1594ea74335";
-const CF_MODEL = "elevenlabs/eleven-turbo-v2-5";
-const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
+const ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
 
 const config = routeConfig(
   "$0.01",
@@ -18,7 +15,7 @@ const config = routeConfig(
     },
     required: ["text"],
   },
-  { text: "...", audio_url: "https://..." }
+  { text: "...", mime_type: "audio/mpeg", audio_base64: "..." }
 );
 
 async function handler(req: NextRequest) {
@@ -39,20 +36,16 @@ async function handler(req: NextRequest) {
   }
 
   const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN || ""}`,
+        "xi-api-key": process.env.ELEVENLABS_API_KEY || "",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: CF_MODEL,
-        input: {
-          text,
-          voice_id: DEFAULT_VOICE_ID,
-          output_format: "mp3_44100_128",
-        },
+        text,
+        model_id: "eleven_flash_v2_5",
       }),
     }
   );
@@ -72,20 +65,14 @@ async function handler(req: NextRequest) {
     );
   }
 
-  const json = await res.json();
-  const audioUrl = json?.result?.audio;
-
-  if (!audioUrl) {
-    return NextResponse.json(
-      { error: "no audio returned by upstream", upstream_body: JSON.stringify(json).slice(0, 300) },
-      { status: 502 }
-    );
-  }
+  const arrayBuffer = await res.arrayBuffer();
+  const audioBase64 = Buffer.from(arrayBuffer).toString("base64");
 
   return NextResponse.json({
     text,
     timestamp: new Date().toISOString(),
-    audio_url: audioUrl,
+    mime_type: "audio/mpeg",
+    audio_base64: audioBase64,
   });
 }
 
