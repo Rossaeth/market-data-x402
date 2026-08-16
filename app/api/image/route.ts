@@ -45,7 +45,7 @@ async function handler(req: NextRequest) {
         Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN || ""}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt, steps: 4 }),
+      body: JSON.stringify({ prompt, steps: 4, width: 512, height: 512 }),
     }
   );
 
