@@ -55,6 +55,12 @@ const endpoints = [
     desc: "Text-to-speech audio generation (any text)",
     example: "?text=Bitcoin just crossed sixty three thousand dollars",
   },
+  {
+    path: "/api/image",
+    price: "$0.01",
+    desc: "AI image generation from a text prompt",
+    example: "?prompt=a cyberpunk bull running through a neon city",
+  },
 ];
 
 export default function Home() {
