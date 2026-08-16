@@ -38,17 +38,14 @@ async function handler(req: NextRequest) {
   }
 
   const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run`,
+    `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run/${CF_MODEL}`,
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN || ""}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: CF_MODEL,
-        input: { prompt, steps: 4 },
-      }),
+      body: JSON.stringify({ prompt, steps: 4 }),
     }
   );
 
